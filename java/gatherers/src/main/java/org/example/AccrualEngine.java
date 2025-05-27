@@ -3,8 +3,11 @@ package org.example;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.MonthDay;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Gatherer;
 import java.util.stream.Stream;
 
@@ -81,43 +84,109 @@ public class AccrualEngine {
     }
     private static Gatherer<TimeOffChange, ?, TimeOffChange> accrue(LocalDate dateGenerateChangesTo) {
         class State {
-            Month month = Month.JANUARY;
-            boolean accrualMetOrCreated = false; // TODO remove
+            /// `null` for "all year accrued"
+            Month monthExpectingAccrual = Month.JANUARY;
+            int balance = 0;
         }
+        class Util {
+            private static Month incrementMonth(Month month) {
+                if (month == Month.DECEMBER) {
+                    return null;
+                }
+                return month.plus(1);
+            }
+
+            private static int hoursToAccrue(int hoursToAccruePerMonth, int balanceInHours, int accrualLimitInHours) {
+                // this should never be negative
+                int availableBelowLimit = accrualLimitInHours - balanceInHours;
+                return Math.min(availableBelowLimit, hoursToAccruePerMonth);
+            }
+
+            private static void addAccruals(Month firstInclusive, Month lastInclusive, State state, Gatherer.Downstream<>) {}
+        }
+        final int hoursToAccruePerMonth = 12;
+        final int accrualLimitInHours = 48;
         final Month lastMonthToAccrue = dateGenerateChangesTo.getMonth();
         return Gatherer.ofSequential(
                 State::new,
                 (state, timeOffChange, downstream) -> {
-                    if (timeOffChange.type == ChangeType.ACCRUAL
-                            && timeOffChange.date.getMonth() == state.month
-                            && timeOffChange.date.getDayOfMonth() == 1
-                            && timeOffChange.date.getMonth().compareTo(lastMonthToAccrue) <= 0) {
-                        state.month = state.month.plus(1);
-                        return downstream.push(timeOffChange);
-                    }
-                    if (timeOffChange.type == ChangeType.ACCRUAL
-                            && isBefore(timeOffChange.date.getMonth(), state.month)) {
+                    if (EnumSet.of(ChangeType.YEAREND_EXPIRY, ChangeType.ACCRUAL).contains(timeOffChange.type)) {
                         return !downstream.isRejecting();
                     }
-                    if (timeOffChange.type == ChangeType.ACCRUAL
-                            && timeOffChange.date.getMonth().compareTo(state.month) > 0)) {
-                        return !downstream.isRejecting();
-                    }
-                    if (timeOffChange.type == ChangeType.ACCRUAL
-                            && timeOffChange.date.getMonth().compareTo(lastMonthToAccrue) > 0)) {
-                        return !downstream.isRejecting();
-                    }
-                    if (timeOffChange.date.getMonth() > state.month &&) {}
-                    if (timeOffChange.date.getMonth().isAf) {
+                    final boolean accruingDone = state.monthExpectingAccrual == null
+                            || state.monthExpectingAccrual.compareTo(lastMonthToAccrue) > 0;
+                    if (accruingDone) {
                         return switch (timeOffChange.type) {
                             case CARRYOVER, USAGE, CARRYOVER_EXPIRY -> downstream.push(timeOffChange);
-                            case ACCRUAL, YEAREND_EXPIRY -> !downstream.isRejecting();
+                            default -> !downstream.isRejecting();
                         };
                     }
+                    final LocalDate expectedAccrualDate = timeOffChange.date
+                            .withDayOfMonth(1)
+                            .withMonth(state.monthExpectingAccrual.getValue());
+                    final boolean accrualMissingForCurrentMonth = timeOffChange.date.isAfter(expectedAccrualDate);
+                    // "generate accruals till date"
+                    while (!downstream.isRejecting() && accrualMissingForCurrentMonth.get()) {
+
+                    }
+
+                    // "process the incoming change"
+                    return downstream.push(timeOffChange);
+
+                    // TODO remove ------⬇️
+                    boolean existingAccrualFound = timeOffChange.type == ChangeType.ACCRUAL
+                            && timeOffChange.date.getDayOfMonth() == 1
+                            && timeOffChange.date.getMonth() == state.monthExpectingAccrual;
+                    if (existingAccrualFound) {
+                        state.monthExpectingAccrual = Util.incrementMonth(state.monthExpectingAccrual);
+                        state.balance += timeOffChange.hours;
+                        return downstream.push(timeOffChange);
+                    }
+                    boolean nonAccrualOnFirstDayOfMonth = timeOffChange.type != ChangeType.ACCRUAL
+                            && timeOffChange.date.getDayOfMonth() == 1
+                            && timeOffChange.date.getMonth() == state.monthExpectingAccrual;
+                    if (nonAccrualOnFirstDayOfMonth) {
+                        return switch (timeOffChange.type) {
+                            case CARRYOVER, USAGE, CARRYOVER_EXPIRY -> {
+                                state.balance += timeOffChange.hours;
+                                yield downstream.push(timeOffChange);
+                            }
+                            default -> throw new AssertionError("this should never happen");
+                        };
+                    }
+                    final boolean accrualTooEarly = timeOffChange.type == ChangeType.ACCRUAL
+                            && Month.from(timeOffChange.date) != state.monthExpectingAccrual;
+                    if (accrualTooEarly) {
+                        Util.addAccruals(state.monthExpectingAccrual, timeOffChange., hoursToAccruePerMonth, state, accrualLimitInHours, downstream);
+                    }
+                    boolean existingAccrualMissingAfterFirstDayOfMonth =
+                            Month.from(timeOffChange.date) != state.monthExpectingAccrual
+                            || timeOffChange.date.getDayOfMonth() != 1;
+                    if (existingAccrualMissingAfterFirstDayOfMonth) {
+                        Util.addAccruals(state.monthExpectingAccrual, hoursToAccruePerMonth, state, accrualLimitInHours, downstream);
+                    }
+                    throw new AssertionError("this should never happen");
                 },
-                (state, sink) -> {}
+                (state, sink) -> {
+                    Supplier<Boolean> monthMissesAccrual = () -> state.monthExpectingAccrual != null
+                            && state.monthExpectingAccrual.compareTo(lastMonthToAccrue) <= 0;
+                    while (monthMissesAccrual.get() && !sink.isRejecting()) {
+                        final int accrualHours = Util.hoursToAccrue(hoursToAccruePerMonth, state.balance, accrualLimitInHours);
+                        sink.push(new TimeOffChange(
+                                dateGenerateChangesTo.withMonth(state.monthExpectingAccrual.getValue()).withDayOfMonth(1),
+                                ChangeType.ACCRUAL,
+                                accrualHours));
+                        state.balance += accrualHours;
+                        state.monthExpectingAccrual = Util.incrementMonth(state.monthExpectingAccrual);
+                    }
+                }
         );
     }
+
+    private static void addAccruals(Month monthExpectingAccrual, int hoursToAccruePerMonth, State state, int accrualLimitInHours, Gatherer.Downstream<? super TimeOffChange> downstream) {
+
+    }
+
     private static Gatherer<TimeOffChange, ?, TimeOffChange> yearEndExpiry() {
         class State {
             int sum = 0;
