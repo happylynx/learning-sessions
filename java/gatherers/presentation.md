@@ -59,27 +59,54 @@
 
 [Demo](src/main/java/org/example/LazyEvaluation.java)
 
-### Execution omission
+### Execution elision
+
+* `count()`
 
 [Demo](src/main/java/org/example/OperationExecutionOmitted.java)
 
 ### Stream, Spliterator, Iterator
 
-<details>
-<summary>Task</summary>
+Spliterator - in principle an iterator with `characteristics()`, `estimateSize()` and `trySplit()`
 
 #### Iterator to Stream
-</details>
 
-<details>
-<summary>Task</summary>
+```java
+Iterator<Integer> iterator = ...;
+Stream<Integer> = StreamSupport.stream(Spliterators.spliterator(iterator), false /*parallel*/);
+```
 
 #### Stream to Iterator
-</details>
+
+* `Stream.iterator()`
+* `Stream.spliterator()`
+* the only terminal operations that allow to gradually read stream results
 
 ### Primitive types specialization
 
+* Specialization
+  * IntStream
+  * LongStream
+  * DoubleStream
+* Primitives vs References in Java, Generics
+* `gather()` not added to the primitive specializations
+
 ### Universal terminal operation - `collect()`
+
+* Interface `Collector<T, A, R>`
+  * `supplier()`
+  * `accumulator()`
+  * `combiner()`
+  * `finisher()`
+  * `characteristics()`
+
+#### Creation
+
+// TODO
+
+#### `Collectors`
+
+// TODO show example of `reduce()` implemented using collector
 
 <details>
 <summary>Task</summary>
@@ -95,18 +122,28 @@
 
 ## Universal intermediate operation - `gather()`
 
+TODO motivation
+* universal operation - less need for further change Stream API
+* last element "callback"
+* shared state among processing of multiple elements
+* control over Sequential / Parallel processing
+* ability to "short-circuit" the stream
+
 ### `Gatherer<>`
 
 #### `Gatherer<>`
 
 * initializer
-* integrator
+* `Integrator`
+  * `Downstream`
 * combiner
 * finisher
 
 #### Steps of evaluation
 
-From [Gatherer](https://docs.oracle.com/en/java/javase/24/docs/api/java.base/java/util/stream/Gatherer.html) javadoc
+Sequential evaluation. Combiner is not used.
+
+From [Gatherer](https://docs.oracle.com/en/java/javase/24/docs/api/java.base/java/util/stream/Gatherer.html) javadoc:
 
 ```java
 Gatherer.Downstream<? super R> downstream = ...;
@@ -123,9 +160,16 @@ TODO sorted() reimplementation demo
 #### Parallel evaluation
 
 * controlled by usage of `Gatherer#defaultCombiner`
-  * TODO in both sequential and parallel streams?
+  * when used, only evaluated sequentially
+  * `Gatherer.of()` vs `Gatherer.ofSequential()`
 
-TODO add example logging threads used 
+TODO add a diagram
+
+[Parallel evaluation](src/main/java/org/example/GathererParallelPipeline.java)
+
+#### Short-curcuiting
+
+* integrator returns `false`
 
 #### `andThen()` composition
 
@@ -133,10 +177,24 @@ TODO +1, map-toString demo
 
 #### `Gatherer.Integrator.Greedy`
 
+* `Gatherer.Integrator.ofGreedy`
+* optimization of parallel processing
+
+#### Gatherer as a class
+
+[Demo](src/main/java/org/example/AverageGatherer.java)
+
 ### `Gatherers`
+
+* `fold()`
+* `scan()`
+* `windowFixed()`
+* `windowsSliding()`
+* `mapConcurrent()`
 
 <details>
 <summary>Task</summary>
 
 #### Sliding window average using `gather()`
 </details>
+
