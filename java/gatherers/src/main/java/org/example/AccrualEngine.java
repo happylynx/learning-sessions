@@ -39,7 +39,7 @@ public class AccrualEngine {
                                 -40)
                 )
                 .parallel()
-                .gather(accrualEngine(LocalDate.of(2025, 5, 13)))
+                .gather(accrualEngine(LocalDate.of(2025, 9, 11)))
                 .toList();
         changes.forEach(System.out::println);
     }
@@ -87,7 +87,7 @@ public class AccrualEngine {
     }
     private static Gatherer<TimeOffChange, ?, TimeOffChange> accrue(LocalDate dateGenerateChangesTo) {
         class State {
-            /// `null` for "all year accrued"
+            /// `null` for "whole year accrued"
             Month monthExpectingAccrual = Month.JANUARY;
             int balance = 0;
         }
@@ -112,10 +112,14 @@ public class AccrualEngine {
                     int year,
                     int hoursToAccruePerMonth,
                     int accrualLimitInHours,
+                    Month lastMonthToAccrue,
                     Gatherer.Downstream<? super TimeOffChange> downstream) {
                 for (
                         Month month = firstInclusive;
-                        month != null && month.compareTo(lastInclusive) <= 0 && !downstream.isRejecting();
+                        month != null
+                                && month.compareTo(lastInclusive) <= 0
+                                && month.compareTo(lastMonthToAccrue) <= 0
+                                && !downstream.isRejecting();
                         month = incrementMonth(month)) {
                     final int hours = hoursToAccrue(hoursToAccruePerMonth, state.balance, accrualLimitInHours);
                     downstream.push(new TimeOffChange(
@@ -172,6 +176,7 @@ public class AccrualEngine {
                             dateGenerateChangesTo.getYear(),
                             hoursToAccruePerMonth,
                             accrualLimitInHours,
+                            lastMonthToAccrue,
                             downstream
                     );
                 }
