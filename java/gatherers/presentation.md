@@ -164,22 +164,25 @@ TODO sorted() reimplementation demo
   * `Gatherer.of()` vs `Gatherer.ofSequential()`
 
 TODO add a diagram
+  * with respect to threads
+  * with respect to data splitting and merging
 
 [Parallel evaluation](src/main/java/org/example/GathererParallelPipeline.java)
 
-#### Short-curcuiting
+#### Short-circuiting
 
 * integrator returns `false`
+
+#### `Gatherer.Integrator.Greedy`
+
+* greedy = it never short-circuits
+* created by `Gatherer.Integrator.ofGreedy()`
+* optimization of parallel processing
+
 
 #### `andThen()` composition
 
 TODO +1, map-toString demo
-
-#### `Gatherer.Integrator.Greedy`
-
-* `Gatherer.Integrator.ofGreedy`
-* optimization of parallel processing
-
 #### Gatherer as a class
 
 [Demo](src/main/java/org/example/AverageGatherer.java)
@@ -192,9 +195,16 @@ TODO +1, map-toString demo
 * `windowsSliding()`
 * `mapConcurrent()`
 
+### Complex example
+
+[Time-off calculation demo](src/main/java/org/example/AccrualEngine.java)
+
 <details>
 <summary>Task</summary>
 
 #### Sliding window average using `gather()`
+
+TODO fix
+[Time-off calculation demo](src/main/java/org/example/task/.java)
 </details>
 

@@ -19,12 +19,7 @@ public class AverageGatherer {
         System.out.println("average = " + average.getResult());
     }
 
-    private static class Accumulator {
-        int sum = 0;
-        int count = 0;
-    }
-
-    private static class Average implements Gatherer<Integer, Accumulator, Integer> {
+    private static class Average implements Gatherer<Integer, Average.Accumulator, Integer> {
 
         private float result;
 
@@ -60,6 +55,11 @@ public class AverageGatherer {
 
         public float getResult() {
             return result;
+        }
+
+        private static class Accumulator {
+            int sum = 0;
+            int count = 0;
         }
     }
 }
